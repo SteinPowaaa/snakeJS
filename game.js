@@ -1,6 +1,7 @@
 const size = 14; // so that there is space in between squares
 const movementVar = 15;
 
+var currentGame;
 var canvas;
 var ctx;
 var direction = 'right'; // right is initial direction
@@ -8,7 +9,7 @@ var snakeCoordinates = [[15, 15], [30, 15], [45, 15], [60, 15]];
 
 var AppleGenerator = (function() {
     function cls(){
-        this.applePosition;
+        this.position;
     }
 
     // Generate random number coordinates [x, y] for apple
@@ -19,7 +20,7 @@ var AppleGenerator = (function() {
         var y = closestDivisibleBy(randomNumberBetween(canvas.width,
                                                        canvas.height),
                                    movementVar);
-        this.applePosition = [x, y];
+        this.position = [x, y];
     };
 
     // Generate random number for apple to spawn
@@ -71,7 +72,7 @@ var Game = (function() {
 
     cls.prototype.begin = function() {
         init(height, width);
-        //setInterval(update(), 60);
+        //currentGame = setInterval(update(), 60);
     };
 
     // Canvas init
@@ -94,12 +95,12 @@ var Gameplay = (function() {
 
     cls.prototype.paint = function() {
         draw(snakeCoordinates, ctx);
-        draw(apple.applePosition, ctx);
+        draw(apple.position, ctx);
     };
 
     var calculate = function(snake, apple) {
         snake.move(coordinates);
-        if (snake.head != apple) {
+        if (snake.head != apple.position) {
             snake.removeTail();
         } else {
             apple.generateCoordinates();
