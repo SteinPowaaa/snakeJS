@@ -1,0 +1,9 @@
+h1 {
+  color: blue;
+  text-align: center;
+}
+
+canvas {
+  outline: thick solid;
+  background: rgb(100, 188, 71);
+}
