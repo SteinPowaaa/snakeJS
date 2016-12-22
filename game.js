@@ -1,24 +1,21 @@
 const size = 14; // so that there is space in between squares
 const movementVar = 15;
 
-var currentGame;
-var canvas;
-var ctx;
 var direction = 'right'; // right is initial direction
-
+var currentGame;
 
 var AppleGenerator = (function() {
     function cls(){
-        this.position;
     }
 
     // Generate random number coordinates [x, y] for apple
     cls.prototype.generateCoordinates = function(canvas) {
-        var x = closestDivisibleBy(randomNumberBetween(canvas.width,
-                                                       canvas.height),
+        // Offset so it doesn't spawn off the edge
+        var x = closestDivisibleBy(
+            randomNumberBetween(0, canvas.width - movementVar),
                                    movementVar);
-        var y = closestDivisibleBy(randomNumberBetween(canvas.width,
-                                                       canvas.height),
+        var y = closestDivisibleBy(
+            randomNumberBetween(0, canvas.height - movementVar),
                                    movementVar);
         this.position = [x, y];
     };
@@ -41,13 +38,7 @@ var Snake = (function() {
         this.coordinates = snakeCoordinates;
     }
 
-    cls.prototype.move = function(coordinateIncrement) {
-        joinedCoordinates = _.zip(coordinateIncrement, this.head);
-        newCoordinates = joinedCoordinates.map(function(coordinate){
-            return coordinate.reduce(function(sum, number){
-                return sum + number;
-            });
-        });
+    cls.prototype.move = function(newCoordinates) {
         this.coordinates.push(newCoordinates);
     };
 
@@ -71,31 +62,36 @@ var Game = (function() {
     }
 
     cls.prototype.start = function() {
-        // ctx.clearRect(0, 0, canvnas.width, canvas.height);
-        this.height = prompt('Enter Height: ');
-        this.width = prompt('Enter Width');
-        this.snake = new Snake([[15, 15], [30, 15], [45, 15], [60, 15]]);
-        this.apple = new AppleGenerator;
-        this.apple.generateCoordinates();
-        this.gameplay = new Gameplay;
-        begin();
+        this.width = 1250;//prompt('Enter Width');
+        this.height = 600;//prompt('Enter Height: ');
+        var canvas = init(this.width, this.height);
+        var ctx = canvas.getContext("2d");
+        var snake = new Snake([[15, 15],
+                               [30, 15],
+                               [45, 15],
+                               [60, 15]]);
+        var apple = new AppleGenerator;
+        apple.generateCoordinates(canvas);
+        var gameplay = new Gameplay;
+        begin(snake, apple, ctx, gameplay, canvas);
     };
 
-    var begin = function() {
-        init(this.height, this.width);
-        this.currentGame = setInterval(this.gameplay.execute, 60);
-        this.start();
+    var begin = function(snake, apple, ctx, gameplay, canvas) {
+        currentGame = setInterval(function() {
+            gameplay.execute(snake, apple, ctx, canvas);
+        }, 60);
+        //this.start;
     };
 
     // Canvas init
     var init = function(width, height) {
-        canvas =
-            $('<canvas/>',{'id':'snakeCanvas'})
-            .attr({'width': width, 'height': height})[0];
+        var canvas =
+                $('<canvas/>',{'id':'snakeCanvas'})
+                .attr({'width': width, 'height': height})[0];
 
         $('#work_area').append(canvas);
 
-        ctx = canvas.getContext("2d");
+        return canvas;
     };
 
     return cls;
@@ -105,28 +101,60 @@ var Gameplay = (function() {
     function cls() {
     }
 
-    cls.prototype.execute = function(snake, apple) {
-        calculate(snake, apple);
-        paint(snake, apple);
+    cls.prototype.execute = function(snake, apple, ctx, canvas) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        update(snake, apple, canvas);
+        paint(snake, apple, ctx);
+        gameEnd(snake, canvas);
     };
 
-    var paint = function(snake, apple) {
-        draw(snake.coordinates, ctx);
-        draw([apple.position], ctx);
+    var gameEnd = function(snake, canvas) {
+        if (hitWall(snake, canvas) || eatSelf(snake)){
+            clearInterval(currentGame);
+        }
     };
 
-    var calculate = function(snake, apple) {
+    var hitWall = function(snake, canvas) {
+        return snake.head()[0] >= canvas.width - movementVar ||
+            snake.head()[1] >= canvas.height - movementVar ||
+            snake.head()[0] <= -1 ||
+            snake.head()[1] <= -1;
+    };
+
+    var eatSelf = function(snake){
+        for(i=0; i<snake.coordinates.length - 1; i++){
+            if (_.isEqual(snake.head(), snake.coordinates[i])) {
+                return true;
+            }
+        }
+        return false;
+    };
+
+    var paint = function(snake, apple, ctx) {
+        drawSquares(snake.coordinates, ctx);
+        drawColorSquare(apple.position, ctx);
+    };
+
+    var update = function(snake, apple, canvas) {
         coordinateIncrement = tranformKeyToCoordinate();
-        snake.move(coordinateIncrement);
-        if (snake.head != apple.position) {
+        joinedCoordinates = _.zip(coordinateIncrement, snake.head());
+        newCoordinates = joinedCoordinates.map(function(coordinate){
+            return coordinate.reduce(function(sum, number){
+                return sum + number;
+            });
+        });
+        snake.move(newCoordinates);
+        if (!_.isEqual(snake.head(), apple.position)) {
             snake.removeTail();
         } else {
-            apple.generateCoordinates();
+            apple.generateCoordinates(canvas);
         }
     };
 
     // Get directions from keypressed
     $(document).keydown(function(e) {
+        e.preventDefault(); //so it doesn't move window if canvas too big
+
         var key = e.which;
 
         if (key == 38) { direction = 'up'; }
@@ -134,6 +162,10 @@ var Gameplay = (function() {
         if (key == 37) { direction = 'left'; }
         if (key == 39) { direction = 'right'; }
     });
+
+    var modifySnake = function() {
+
+    };
 
     var tranformKeyToCoordinate = function() {
         switch(direction) {
@@ -152,20 +184,22 @@ var Gameplay = (function() {
         }
     };
 
-    var draw = function(figureCoordinates, ctx) {
+    var drawSquares = function(figureCoordinates, ctx) {
         ctx.fillStyle = "rgb(200, 350, 0)";
         figureCoordinates.forEach(function(coordinate) {
             ctx.fillRect(coordinate[0], coordinate[1], size, size);
         });
     };
 
+    var drawColorSquare = function(figureCoordinates, ctx){
+        ctx.fillStyle = "rgb(300, 0, 0)";
+        ctx.fillRect(figureCoordinates[0],
+                     figureCoordinates[1],
+                     size,size);
+    };
+
     return cls;
 })();
 
-//init(1250, 600);
-//draw(snakeCoordinates, ctx);
-game = new Gameplay
-snake = new Snake([1,2,3]);
-console.log(snake.coordinates);
-apple = new AppleGenerator();
-a = apple.generateCoordinates(canvas);
+game = new Game;
+game.start();
