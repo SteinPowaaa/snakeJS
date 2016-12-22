@@ -6,6 +6,7 @@ var canvas;
 var ctx;
 var direction = 'right'; // right is initial direction
 
+
 var AppleGenerator = (function() {
     function cls(){
         this.position;
@@ -66,10 +67,11 @@ var Snake = (function() {
 })();
 
 var Game = (function() {
-    function cls(height, width, update) {
+    function cls() {
     }
 
     cls.prototype.start = function() {
+        // ctx.clearRect(0, 0, canvnas.width, canvas.height);
         this.height = prompt('Enter Height: ');
         this.width = prompt('Enter Width');
         this.snake = new Snake([[15, 15], [30, 15], [45, 15], [60, 15]]);
@@ -81,7 +83,7 @@ var Game = (function() {
 
     var begin = function() {
         init(this.height, this.width);
-        var currentGame = setInterval(this.gameplay.execute, 60);
+        this.currentGame = setInterval(this.gameplay.execute, 60);
         this.start();
     };
 
@@ -103,17 +105,18 @@ var Gameplay = (function() {
     function cls() {
     }
 
-    cls.prototype.execute = function() {
-
+    cls.prototype.execute = function(snake, apple) {
+        calculate(snake, apple);
+        paint(snake, apple);
     };
 
-    var paint = function() {
-        draw(snakeCoordinates, ctx);
+    var paint = function(snake, apple) {
+        draw(snake.coordinates, ctx);
         draw([apple.position], ctx);
     };
 
-    var calculate = function(snake, apple, direction) {
-        coordinateIncrement = tranformKeyToCoordinate(direction);
+    var calculate = function(snake, apple) {
+        coordinateIncrement = tranformKeyToCoordinate();
         snake.move(coordinateIncrement);
         if (snake.head != apple.position) {
             snake.removeTail();
@@ -132,7 +135,7 @@ var Gameplay = (function() {
         if (key == 39) { direction = 'right'; }
     });
 
-    var tranformKeyToCoordinate = function(direction) {
+    var tranformKeyToCoordinate = function() {
         switch(direction) {
         case 'up':
             return [0, -movementVar];
@@ -155,8 +158,6 @@ var Gameplay = (function() {
             ctx.fillRect(coordinate[0], coordinate[1], size, size);
         });
     };
-
-    // ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     return cls;
 })();
