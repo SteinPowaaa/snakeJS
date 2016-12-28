@@ -1,41 +1,18 @@
-const size = 14; // so that there is space in between squares
-const movementVar = 15;
-
-var direction = 'right'; // right is initial direction
-var currentGame;
-
-var AppleGenerator = (function() {
+var Apple = (function() {
     function cls(){
     }
 
     // Generate random number coordinates [x, y] for apple
-    cls.prototype.generateCoordinates = function(canvas) {
-        // Offset so it doesn't spawn off the edge
-        var x = closestDivisibleBy(
-            randomNumberBetween(0, canvas.width - movementVar),
-                                   movementVar);
-        var y = closestDivisibleBy(
-            randomNumberBetween(0, canvas.height - movementVar),
-                                   movementVar);
-        this.position = [x, y];
-    };
-
-    // Generate random number for apple to spawn
-    function randomNumberBetween(lo, hi) {
-        return Math.floor(lo + Math.random() * (hi - lo));
-    };
-
-    // Make sure number is in snake range
-    function closestDivisibleBy(n, divisor) {
-        return Math.round(n / divisor) * divisor;
+    cls.prototype.move = function(coordinates) {
+        this.position = coordinates;
     };
 
     return cls;
 })();
 
 var Snake = (function() {
-    function cls(snakeCoordinates) {
-        this.coordinates = snakeCoordinates;
+    function cls() {
+        this.reset();
     }
 
     cls.prototype.move = function(newCoordinates) {
@@ -54,44 +31,52 @@ var Snake = (function() {
         this.coordinates.shift();
     };
 
+    cls.prototype.reset = function() {
+        this.coordinates = [[15, 15],
+                           [30, 15],
+                           [45, 15],
+                           [60, 15]];
+    };
+
     return cls;
 })();
 
 var Game = (function() {
     function cls() {
+        this.snake = new Snake();
+        this.apple = new Apple();
+        this.gameplay = new Gameplay();
+        this.intervalID;
+        this.score = 0;
     }
 
     cls.prototype.start = function() {
-        this.width = 1250;//prompt('Enter Width');
-        this.height = 600;//prompt('Enter Height: ');
-        var canvas = init(this.width, this.height);
-        var ctx = canvas.getContext("2d");
-        var snake = new Snake([[15, 15],
-                               [30, 15],
-                               [45, 15],
-                               [60, 15]]);
-        var apple = new AppleGenerator;
-        apple.generateCoordinates(canvas);
-        var gameplay = new Gameplay;
-        begin(snake, apple, ctx, gameplay, canvas);
+        this.apple.move(this.gameplay.generateCoordinates());
+        this.snake.reset();
+        this.gameplay.reset();
+        this.execute();
+
     };
 
-    var begin = function(snake, apple, ctx, gameplay, canvas) {
-        currentGame = setInterval(function() {
-            gameplay.execute(snake, apple, ctx, canvas);
-        }, 60);
-        //this.start;
+    cls.prototype.execute = function() {
+        this.intervalID = setInterval((function() {
+            this.gameplay.execute(this.snake, this.apple);
+            if (this.gameplay.arePositionsEqual(this.snake, this.apple)){
+                debugger;
+                this.score++;
+            }
+            if (this.gameplay.invalid(this.snake)) {
+                this.gameEnd();
+                this.start();
+            }
+            $('#score').text(this.score);
+
+        }).bind(this), 60);
     };
 
-    // Canvas init
-    var init = function(width, height) {
-        var canvas =
-                $('<canvas/>',{'id':'snakeCanvas'})
-                .attr({'width': width, 'height': height})[0];
-
-        $('#work_area').append(canvas);
-
-        return canvas;
+    cls.prototype.gameEnd = function(snake) {
+        clearInterval(this.intervalID);
+        alert("Your score is " + this.score);
     };
 
     return cls;
@@ -99,29 +84,38 @@ var Game = (function() {
 
 var Gameplay = (function() {
     function cls() {
+        this.movementVar = 15;
+
+        this.painter = new Painter;
+        this.direction = 'right';
+
+        this.bindKeyEvents();
     }
 
-    cls.prototype.execute = function(snake, apple, ctx, canvas) {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        update(snake, apple, canvas);
-        paint(snake, apple, ctx);
-        gameEnd(snake, canvas);
+    cls.prototype.reset = function() {
+        this.direction = 'right';
     };
 
-    var gameEnd = function(snake, canvas) {
-        if (hitWall(snake, canvas) || eatSelf(snake)){
-            clearInterval(currentGame);
-        }
+    cls.prototype.execute = function(snake, apple) {
+        this.painter.clear();
+        this.update(snake, apple, this.painter.canvas);
+        this.painter.paint(snake, apple);
     };
 
-    var hitWall = function(snake, canvas) {
-        return snake.head()[0] >= canvas.width - movementVar ||
-            snake.head()[1] >= canvas.height - movementVar ||
+    cls.prototype.invalid = function(snake) {
+        return this.hitWall(snake) || this.eatSelf(snake);
+    };
+
+    cls.prototype.hitWall = function(snake) {
+        return snake.head()[0] >= this.painter
+            .canvas.width - this.movementVar ||
+            snake.head()[1] >= this.painter
+            .canvas.height - this.movementVar ||
             snake.head()[0] <= -1 ||
             snake.head()[1] <= -1;
     };
 
-    var eatSelf = function(snake){
+    cls.prototype.eatSelf = function(snake){
         for(i=0; i<snake.coordinates.length - 1; i++){
             if (_.isEqual(snake.head(), snake.coordinates[i])) {
                 return true;
@@ -130,72 +124,126 @@ var Gameplay = (function() {
         return false;
     };
 
-    var paint = function(snake, apple, ctx) {
-        drawSquares(snake.coordinates, ctx);
-        drawColorSquare(apple.position, ctx);
+    cls.prototype.arePositionsEqual = function(snake, apple) {
+        return _.isEqual(snake.head(), apple.position);
     };
 
-    var update = function(snake, apple, canvas) {
-        coordinateIncrement = tranformKeyToCoordinate();
-        joinedCoordinates = _.zip(coordinateIncrement, snake.head());
-        newCoordinates = joinedCoordinates.map(function(coordinate){
-            return coordinate.reduce(function(sum, number){
-                return sum + number;
-            });
-        });
-        snake.move(newCoordinates);
+    cls.prototype.update = function(snake, apple) {
+        var newSnakeCoordinates = this.generateSnakeCoordinates(snake);
+        snake.move(newSnakeCoordinates);
         if (!_.isEqual(snake.head(), apple.position)) {
             snake.removeTail();
         } else {
-            apple.generateCoordinates(canvas);
+            apple.move(this.generateCoordinates());
         }
     };
 
     // Get directions from keypressed
-    $(document).keydown(function(e) {
-        e.preventDefault(); //so it doesn't move window if canvas too big
+    cls.prototype.bindKeyEvents = function () {
+        $(document).keydown((function(e) {
+            //so it doesn't move window if canvas too big
+            e.preventDefault();
 
-        var key = e.which;
+            var key = e.which;
 
-        if (key == 38) { direction = 'up'; }
-        if (key == 40) { direction = 'down'; }
-        if (key == 37) { direction = 'left'; }
-        if (key == 39) { direction = 'right'; }
-    });
-
-    var modifySnake = function() {
-
+            if (key === 38 && this.direction !== 'down') {
+                this.direction = 'up';
+            }
+            if (key === 40 && this.direction !== 'up') {
+                this.direction = 'down';
+            }
+            if (key === 37 && this.direction !== 'right') {
+                this.direction = 'left';
+            }
+            if (key === 39 && this.direction !== 'left') {
+                this.direction = 'right';
+            }
+        }).bind(this));
     };
 
-    var tranformKeyToCoordinate = function() {
-        switch(direction) {
-        case 'up':
-            return [0, -movementVar];
-            break;
-        case 'down':
-            return [0, movementVar];
-            break;
-        case 'right':
-            return [movementVar, 0];
-            break;
-        case 'left':
-            return [-movementVar, 0];
-            break;
-        }
-    };
-
-    var drawSquares = function(figureCoordinates, ctx) {
-        ctx.fillStyle = "rgb(200, 350, 0)";
-        figureCoordinates.forEach(function(coordinate) {
-            ctx.fillRect(coordinate[0], coordinate[1], size, size);
+    cls.prototype.generateSnakeCoordinates = function(snake) {
+        coordinateIncrement = this.tranformDirectionToCoordinate();
+        joinedCoordinates = _.zip(coordinateIncrement, snake.head());
+        return joinedCoordinates.map(function(coordinate) {
+            return coordinate.reduce(function(sum, number){
+                return sum + number;
+            });
         });
     };
 
-    var drawColorSquare = function(figureCoordinates, ctx){
-        ctx.fillStyle = "rgb(300, 0, 0)";
-        ctx.fillRect(figureCoordinates[0],
-                     figureCoordinates[1],
-                     size,size);
+    cls.prototype.tranformDirectionToCoordinate = function() {
+        return {
+            up: [0, -this.movementVar],
+            down: [0, this.movementVar],
+            right: [this.movementVar, 0],
+            left: [-this.movementVar, 0]
+        }[this.direction];
+    };
+
+    cls.prototype.generateCoordinates = function() {
+    // Offset so it doesn't spawn off the edge
+    var x = closestDivisibleBy(
+        randomNumberBetween(0, this.painter.canvas.width - this.movementVar),
+        this.movementVar);
+    var y = closestDivisibleBy(
+        randomNumberBetween(0, this.painter.canvas.height - this.movementVar),
+        this.movementVar);
+
+        return [x, y];
+    };
+
+    // Generate random number for apple to spawn
+    function randomNumberBetween(lo, hi) {
+        return Math.floor(lo + Math.random() * (hi - lo));
+    };
+
+    // Make sure number is in snake range
+    function closestDivisibleBy(n, divisor) {
+        return Math.round(n / divisor) * divisor;
+    };
+
+    return cls;
+})();
+
+var Painter = (function() {
+    function cls() {
+        this.cellSize = 14;
+        this.width = 1250;//prompt('Enter Width');
+        this.height = 600;//prompt('Enter Height: ');
+        this.initCanvas(this.width, this.height);
+        this.ctx = this.canvas.getContext("2d");
+    }
+
+    cls.prototype.paint = function(snake, apple) {
+        this.drawSquares(snake.coordinates, this.ctx);
+        this.drawColorSquare(apple.position, this.ctx);
+    };
+
+    cls.prototype.drawSquares = function(figureCoordinates) {
+        this.ctx.fillStyle = "rgb(200, 350, 0)";
+        figureCoordinates.forEach((function(coordinate) {
+            this.ctx.fillRect(coordinate[0], coordinate[1],
+                              this.cellSize, this.cellSize);
+        }).bind(this));
+    };
+
+    cls.prototype.drawColorSquare = function(figureCoordinates){
+        this.ctx.fillStyle = "rgb(300, 0, 0)";
+        this.ctx.fillRect(figureCoordinates[0],
+                          figureCoordinates[1],
+                          this.cellSize, this.cellSize);
+    };
+
+    cls.prototype.initCanvas = function() {
+        this.canvas =
+            $('<canvas/>',{'id':'snakeCanvas'})
+            .attr({'width': this.width, 'height': this.height})[0];
+
+        $('#work_area').append(this.canvas);
+    };
+
+    cls.prototype.clear = function(){
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
     };
 
     return cls;
