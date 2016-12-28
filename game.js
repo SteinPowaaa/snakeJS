@@ -47,7 +47,6 @@ var Game = (function() {
         this.apple = new Apple();
         this.gameplay = new Gameplay();
         this.intervalID;
-        this.score = 0;
     }
 
     cls.prototype.start = function() {
@@ -61,22 +60,16 @@ var Game = (function() {
     cls.prototype.execute = function() {
         this.intervalID = setInterval((function() {
             this.gameplay.execute(this.snake, this.apple);
-            if (this.gameplay.arePositionsEqual(this.snake, this.apple)){
-                debugger;
-                this.score++;
-            }
             if (this.gameplay.invalid(this.snake)) {
                 this.gameEnd();
                 this.start();
             }
-            $('#score').text(this.score);
 
         }).bind(this), 60);
     };
 
     cls.prototype.gameEnd = function(snake) {
         clearInterval(this.intervalID);
-        alert("Your score is " + this.score);
     };
 
     return cls;
@@ -122,10 +115,6 @@ var Gameplay = (function() {
             }
         }
         return false;
-    };
-
-    cls.prototype.arePositionsEqual = function(snake, apple) {
-        return _.isEqual(snake.head(), apple.position);
     };
 
     cls.prototype.update = function(snake, apple) {
